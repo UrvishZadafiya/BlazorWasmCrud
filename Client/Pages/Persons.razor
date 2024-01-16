@@ -1,0 +1,100 @@
+﻿@page "/Person"
+@using BlazorWasmCrud.Shared.Models;
+@using BlazorWasmCrud.Shared.VMModel;
+@inject HttpClient http;
+@inject IJSRuntime jsRuntime;
+@inject NavigationManager navMgr
+
+<h3>Persons</h3>
+<a href="/person/add" class="btn btn-secondary my-2">All more</a>
+<div class="row">
+    <div class="col-md-6">
+        <input type="text" class="form-control" @bind="searchText" @bind:event="oninput" @onkeyup="async () => await Search()" placeholder="Search by name and email" />
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            @foreach (var person in personData.Persons)
+            {
+                <tbody>
+                    <tr>
+                        <td>@person.Name</td>
+                        <td>@person.Email</td>
+                        <td>
+                            <a href="person/edit/@person.Id" class="btn btn-success">Edit</a>
+                            <a class="btn btn-danger" @onclick="async ()=> await Delete(person)">Delete</a>
+                        </td>
+                    </tr>
+                </tbody>
+            }
+        </table>
+        <nav aria-label="Page navigation example">
+            <ul class="pagination">
+                @if (personData.PageNumber > 1)
+                {
+                    <li class="page-item">
+                        <a @onclick=" async ()=> await GetPersons(personData.PageNumber - 1)" class="page-link" aria-label="Previous" style="cursor:pointer;">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                }
+
+                @for (int i = 1; i <= personData.TotalPages; i++)
+                {
+                    string activeClass = (i == personData.PageNumber) ? "active" : "";
+                    int c = i;
+                    <li class="page-item @activeClass"><a class="page-link " @onclick="async ()=> await GetPersons(c)" style="cursor:pointer;">@c</a></li>
+                }
+                @if (personData.PageNumber < personData.TotalPages)
+                {
+                    <li class="page-item">
+                        <a @onclick=" async ()=> await GetPersons(personData.PageNumber + 1)" class="page-link" aria-label="Next" style="cursor:pointer;">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    </div>
+</div>
+
+@code {
+    private PersonList personData = new();
+    private string searchText = string.Empty;
+    Status? status = new();
+
+    private async Task Search()
+    {
+        personData.SearchTerm = searchText;
+        GetPersons();
+    }
+
+    private async Task Delete(Person person)
+    {
+        bool confirmed = await jsRuntime.InvokeAsync<bool>("confirm", "Are you sure???");
+        if (confirmed)
+        {
+            status = await http.DeleteFromJsonAsync<Status>($"api/person/Delete/{person.Id}");
+            if (status?.StatusCode == 1)
+            {
+                navMgr.NavigateTo("/persons");
+            }
+        }
+    }
+
+
+    private async Task GetPersons(int pageNo = 1)
+    {
+        personData = await http.GetFromJsonAsync<PersonList>($"api/Person/getall?sTerm={searchText}&pageno={pageNo}");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetPersons();
+    }
+}
+
